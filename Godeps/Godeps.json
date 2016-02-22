@@ -269,8 +269,8 @@
 		},
 		{
 			"ImportPath": "github.com/godbus/dbus",
-			"Comment": "0-7-g939230d",
-			"Rev": "939230d2086a4f1870e04c52e0a376c25bae0ec4"
+			"Comment": "v3",
+			"Rev": "c7fdd8b5cd55e87b4e1f4e372cdb1db61dd6c66f"
 		},
 		{
 			"ImportPath": "github.com/gogo/protobuf/proto",
