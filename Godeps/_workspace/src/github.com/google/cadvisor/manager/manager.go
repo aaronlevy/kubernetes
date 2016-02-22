@@ -21,14 +21,11 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/docker/libcontainer/cgroups"
-	"github.com/golang/glog"
 	"github.com/google/cadvisor/cache/memory"
 	"github.com/google/cadvisor/collector"
 	"github.com/google/cadvisor/container"
@@ -41,6 +38,9 @@ import (
 	"github.com/google/cadvisor/utils/cpuload"
 	"github.com/google/cadvisor/utils/oomparser"
 	"github.com/google/cadvisor/utils/sysfs"
+
+	"github.com/golang/glog"
+	"github.com/opencontainers/runc/libcontainer/cgroups"
 )
 
 var globalHousekeepingInterval = flag.Duration("global_housekeeping_interval", 1*time.Minute, "Interval between global housekeepings")
@@ -61,6 +61,9 @@ type Manager interface {
 
 	// Get information about a container.
 	GetContainerInfo(containerName string, query *info.ContainerInfoRequest) (*info.ContainerInfo, error)
+
+	// Get V2 information about a container.
+	GetContainerInfoV2(containerName string, options v2.RequestOptions) (map[string]v2.ContainerInfo, error)
 
 	// Get information about all subcontainers of the specified container (includes self).
 	SubcontainersInfo(containerName string, query *info.ContainerInfoRequest) ([]*info.ContainerInfo, error)
@@ -155,7 +158,7 @@ func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs, maxHousekeepingIn
 		allowDynamicHousekeeping: allowDynamicHousekeeping,
 	}
 
-	machineInfo, err := getMachineInfo(sysfs, fsInfo)
+	machineInfo, err := getMachineInfo(sysfs, fsInfo, inHostNamespace)
 	if err != nil {
 		return nil, err
 	}
@@ -190,7 +193,6 @@ type manager struct {
 	quitChannels             []chan error
 	cadvisorContainer        string
 	inHostNamespace          bool
-	dockerContainersRegexp   *regexp.Regexp
 	loadReader               cpuload.CpuLoadReader
 	eventHandler             events.EventManager
 	startupTime              time.Time
@@ -376,33 +378,8 @@ func (self *manager) GetContainerSpec(containerName string, options v2.RequestOp
 
 // Get V2 container spec from v1 container info.
 func (self *manager) getV2Spec(cinfo *containerInfo) v2.ContainerSpec {
-	specV1 := self.getAdjustedSpec(cinfo)
-	specV2 := v2.ContainerSpec{
-		CreationTime:     specV1.CreationTime,
-		HasCpu:           specV1.HasCpu,
-		HasMemory:        specV1.HasMemory,
-		HasFilesystem:    specV1.HasFilesystem,
-		HasNetwork:       specV1.HasNetwork,
-		HasDiskIo:        specV1.HasDiskIo,
-		HasCustomMetrics: specV1.HasCustomMetrics,
-		Image:            specV1.Image,
-	}
-	if specV1.HasCpu {
-		specV2.Cpu.Limit = specV1.Cpu.Limit
-		specV2.Cpu.MaxLimit = specV1.Cpu.MaxLimit
-		specV2.Cpu.Mask = specV1.Cpu.Mask
-	}
-	if specV1.HasMemory {
-		specV2.Memory.Limit = specV1.Memory.Limit
-		specV2.Memory.Reservation = specV1.Memory.Reservation
-		specV2.Memory.SwapLimit = specV1.Memory.SwapLimit
-	}
-	if specV1.HasCustomMetrics {
-		specV2.CustomMetrics = specV1.CustomMetrics
-	}
-	specV2.Aliases = cinfo.Aliases
-	specV2.Namespace = cinfo.Namespace
-	return specV2
+	spec := self.getAdjustedSpec(cinfo)
+	return v2.ContainerSpecFromV1(&spec, cinfo.Aliases, cinfo.Namespace)
 }
 
 func (self *manager) getAdjustedSpec(cinfo *containerInfo) info.ContainerSpec {
@@ -418,13 +395,40 @@ func (self *manager) getAdjustedSpec(cinfo *containerInfo) info.ContainerSpec {
 	return spec
 }
 
-// Get a container by name.
 func (self *manager) GetContainerInfo(containerName string, query *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
 	cont, err := self.getContainerData(containerName)
 	if err != nil {
 		return nil, err
 	}
 	return self.containerDataToContainerInfo(cont, query)
+}
+
+func (self *manager) GetContainerInfoV2(containerName string, options v2.RequestOptions) (map[string]v2.ContainerInfo, error) {
+	containers, err := self.getRequestedContainers(containerName, options)
+	if err != nil {
+		return nil, err
+	}
+
+	infos := make(map[string]v2.ContainerInfo, len(containers))
+	for name, container := range containers {
+		cinfo, err := container.GetInfo()
+		if err != nil {
+			return nil, err
+		}
+
+		var nilTime time.Time // Ignored.
+		stats, err := self.memoryCache.RecentStats(name, nilTime, nilTime, options.Count)
+		if err != nil {
+			return nil, err
+		}
+
+		infos[name] = v2.ContainerInfo{
+			Spec:  self.getV2Spec(cinfo),
+			Stats: v2.ContainerStatsFromV1(&cinfo.Spec, stats),
+		}
+	}
+
+	return infos, nil
 }
 
 func (self *manager) containerDataToContainerInfo(cont *containerData, query *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
@@ -742,6 +746,18 @@ func (m *manager) registerCollectors(collectorConfigs map[string]string, cont *c
 
 // Create a container.
 func (m *manager) createContainer(containerName string) error {
+	m.containersLock.Lock()
+	defer m.containersLock.Unlock()
+
+	namespacedName := namespacedContainerName{
+		Name: containerName,
+	}
+
+	// Check that the container didn't already exist.
+	if _, ok := m.containers[namespacedName]; ok {
+		return nil
+	}
+
 	handler, accept, err := container.NewContainerHandler(containerName, m.inHostNamespace)
 	if err != nil {
 		return err
@@ -771,35 +787,15 @@ func (m *manager) createContainer(containerName string) error {
 		return err
 	}
 
-	// Add to the containers map.
-	alreadyExists := func() bool {
-		m.containersLock.Lock()
-		defer m.containersLock.Unlock()
-
-		namespacedName := namespacedContainerName{
-			Name: containerName,
-		}
-
-		// Check that the container didn't already exist.
-		_, ok := m.containers[namespacedName]
-		if ok {
-			return true
-		}
-
-		// Add the container name and all its aliases. The aliases must be within the namespace of the factory.
-		m.containers[namespacedName] = cont
-		for _, alias := range cont.info.Aliases {
-			m.containers[namespacedContainerName{
-				Namespace: cont.info.Namespace,
-				Name:      alias,
-			}] = cont
-		}
-
-		return false
-	}()
-	if alreadyExists {
-		return nil
+	// Add the container name and all its aliases. The aliases must be within the namespace of the factory.
+	m.containers[namespacedName] = cont
+	for _, alias := range cont.info.Aliases {
+		m.containers[namespacedContainerName{
+			Namespace: cont.info.Namespace,
+			Name:      alias,
+		}] = cont
 	}
+
 	glog.V(3).Infof("Added container: %q (aliases: %v, namespace: %q)", containerName, cont.info.Aliases, cont.info.Namespace)
 
 	contSpec, err := cont.handler.GetSpec()
@@ -823,9 +819,7 @@ func (m *manager) createContainer(containerName string) error {
 	}
 
 	// Start the container's housekeeping.
-	cont.Start()
-
-	return nil
+	return cont.Start()
 }
 
 func (m *manager) destroyContainer(containerName string) error {
@@ -1195,7 +1189,10 @@ func (m *manager) DockerInfo() (DockerStatus, error) {
 	}
 	if val, ok := info["DriverStatus"]; ok {
 		var driverStatus [][]string
-		err = json.Unmarshal([]byte(val), &driverStatus)
+		err := json.Unmarshal([]byte(val), &driverStatus)
+		if err != nil {
+			return DockerStatus{}, err
+		}
 		out.DriverStatus = make(map[string]string)
 		for _, v := range driverStatus {
 			if len(v) == 2 {

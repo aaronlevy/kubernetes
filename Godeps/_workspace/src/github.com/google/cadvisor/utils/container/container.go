@@ -1,4 +1,4 @@
-// Copyright 2014 Google Inc. All Rights Reserved.
+// Copyright 2016 Google Inc. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,24 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package mockfs
+package container
 
-import "bytes"
+import (
+	info "github.com/google/cadvisor/info/v1"
+)
 
-type FakeFile struct {
-	bytes.Buffer
-	Name string
-}
-
-func (self *FakeFile) Close() error {
-	return nil
-}
-
-func AddTextFile(mockfs *MockFileSystem, name, content string) *FakeFile {
-	f := &FakeFile{
-		Name:   name,
-		Buffer: *bytes.NewBufferString(content),
+// Returns the alias a container is known by within a certain namespace,
+// if available. Otherwise returns the absolute name of the container.
+func GetPreferredName(ref info.ContainerReference) string {
+	var containerName string
+	if len(ref.Aliases) > 0 {
+		containerName = ref.Aliases[0]
+	} else {
+		containerName = ref.Name
 	}
-	mockfs.EXPECT().Open(name).Return(f, nil).AnyTimes()
-	return f
+	return containerName
 }
