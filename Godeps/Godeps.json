@@ -156,6 +156,11 @@
 			"Rev": "b4a58d95188dd092ae20072bac14cece0e67c388"
 		},
 		{
+			"ImportPath": "github.com/coreos/go-systemd/util",
+			"Comment": "v4",
+			"Rev": "b4a58d95188dd092ae20072bac14cece0e67c388"
+		},
+		{
 			"ImportPath": "github.com/coreos/pkg/capnslog",
 			"Rev": "fa94270d4bac0d8ae5dc6b71894e251aada93f74"
 		},
@@ -225,7 +230,27 @@
 			"Rev": "2b27fe17a1b3fb8472fde96d768fa70996adf201"
 		},
 		{
-			"ImportPath": "github.com/docker/libcontainer",
+			"ImportPath": "github.com/docker/go-units",
+			"Comment": "v0.1.0-21-g0bbddae",
+			"Rev": "0bbddae09c5a5419a8c6dcdd7ff90da3d450393b"
+		},
+		{
+			"ImportPath": "github.com/docker/libcontainer/cgroups",
+			"Comment": "v2.2.1",
+			"Rev": "5dc7ba0f24332273461e45bc49edcb4d5aa6c44c"
+		},
+		{
+			"ImportPath": "github.com/docker/libcontainer/configs",
+			"Comment": "v2.2.1",
+			"Rev": "5dc7ba0f24332273461e45bc49edcb4d5aa6c44c"
+		},
+		{
+			"ImportPath": "github.com/docker/libcontainer/selinux",
+			"Comment": "v2.2.1",
+			"Rev": "5dc7ba0f24332273461e45bc49edcb4d5aa6c44c"
+		},
+		{
+			"ImportPath": "github.com/docker/libcontainer/system",
 			"Comment": "v2.2.1",
 			"Rev": "5dc7ba0f24332273461e45bc49edcb4d5aa6c44c"
 		},
@@ -471,6 +496,11 @@
 			"Rev": "3f504e8dabd5d562e997d19ce0200aa41973e1b2"
 		},
 		{
+			"ImportPath": "github.com/mistifyio/go-zfs",
+			"Comment": "v2.1.1-5-g1b4ae6f",
+			"Rev": "1b4ae6fb4e77b095934d4430860ff202060169f8"
+		},
+		{
 			"ImportPath": "github.com/mitchellh/mapstructure",
 			"Rev": "740c764bc6149d3f1806231418adb9f52c11bcbf"
 		},
@@ -487,6 +517,11 @@
 			"ImportPath": "github.com/onsi/gomega",
 			"Comment": "v1.0-28-g8adf9e1",
 			"Rev": "8adf9e1730c55cdc590de7d49766cb2acc88d8f2"
+		},
+		{
+			"ImportPath": "github.com/opencontainers/runc/libcontainer",
+			"Comment": "v0.0.7",
+			"Rev": "7ca2aa4873aea7cb4265b1726acb24b90d8726c6"
 		},
 		{
 			"ImportPath": "github.com/pborman/uuid",
@@ -531,6 +566,10 @@
 		{
 			"ImportPath": "github.com/scalingdata/gcfg",
 			"Rev": "37aabad69cfd3d20b8390d902a8b10e245c615ff"
+		},
+		{
+			"ImportPath": "github.com/seccomp/libseccomp-golang",
+			"Rev": "1b506fc7c24eec5a3693cdcbed40d9c226cfc6a1"
 		},
 		{
 			"ImportPath": "github.com/shurcooL/sanitized_anchor_name",
@@ -580,6 +619,10 @@
 		{
 			"ImportPath": "github.com/vaughan0/go-ini",
 			"Rev": "a98ad7ee00ec53921f08832bc06ecf7fd600e6a1"
+		},
+		{
+			"ImportPath": "github.com/vishvananda/netlink",
+			"Rev": "1e2e08e8a2dcdacaae3f14ac44c5cfa31361f270"
 		},
 		{
 			"ImportPath": "github.com/xyproto/simpleredis",
