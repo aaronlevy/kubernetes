@@ -235,26 +235,6 @@
 			"Rev": "0bbddae09c5a5419a8c6dcdd7ff90da3d450393b"
 		},
 		{
-			"ImportPath": "github.com/docker/libcontainer/cgroups",
-			"Comment": "v2.2.1",
-			"Rev": "5dc7ba0f24332273461e45bc49edcb4d5aa6c44c"
-		},
-		{
-			"ImportPath": "github.com/docker/libcontainer/configs",
-			"Comment": "v2.2.1",
-			"Rev": "5dc7ba0f24332273461e45bc49edcb4d5aa6c44c"
-		},
-		{
-			"ImportPath": "github.com/docker/libcontainer/selinux",
-			"Comment": "v2.2.1",
-			"Rev": "5dc7ba0f24332273461e45bc49edcb4d5aa6c44c"
-		},
-		{
-			"ImportPath": "github.com/docker/libcontainer/system",
-			"Comment": "v2.2.1",
-			"Rev": "5dc7ba0f24332273461e45bc49edcb4d5aa6c44c"
-		},
-		{
 			"ImportPath": "github.com/docker/spdystream",
 			"Rev": "b2c3287865f3ad6aa22821ddb7b4692b896ac207"
 		},
