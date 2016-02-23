@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"syscall"
 
-	"github.com/docker/libcontainer/selinux"
+	"github.com/opencontainers/runc/libcontainer/selinux"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/util/mount"
 )

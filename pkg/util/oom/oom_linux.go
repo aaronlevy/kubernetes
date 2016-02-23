@@ -24,8 +24,8 @@ import (
 	"path"
 	"strconv"
 
-	"github.com/docker/libcontainer/cgroups/fs"
-	"github.com/docker/libcontainer/configs"
+	"github.com/opencontainers/runc/libcontainer/cgroups/fs"
+	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/golang/glog"
 )
 

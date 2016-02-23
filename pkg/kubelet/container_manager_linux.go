@@ -26,10 +26,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/libcontainer/cgroups"
-	"github.com/docker/libcontainer/cgroups/fs"
-	"github.com/docker/libcontainer/configs"
 	"github.com/golang/glog"
+	"github.com/opencontainers/runc/libcontainer/cgroups"
+	"github.com/opencontainers/runc/libcontainer/cgroups/fs"
+	"github.com/opencontainers/runc/libcontainer/configs"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
@@ -136,8 +136,10 @@ func newContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 func createManager(containerName string) *fs.Manager {
 	return &fs.Manager{
 		Cgroups: &configs.Cgroup{
-			Name:            containerName,
-			AllowAllDevices: true,
+			Name: containerName,
+			Resources: &configs.Resources{
+				AllowAllDevices: true,
+			},
 		},
 	}
 }
@@ -216,10 +218,12 @@ func (cm *containerManagerImpl) setupNode() error {
 
 		dockerContainer := &fs.Manager{
 			Cgroups: &configs.Cgroup{
-				Name:            cm.dockerDaemonContainerName,
-				Memory:          memoryLimit,
-				MemorySwap:      -1,
-				AllowAllDevices: true,
+				Name: cm.dockerDaemonContainerName,
+				Resources: &configs.Resources{
+					Memory:          memoryLimit,
+					MemorySwap:      -1,
+					AllowAllDevices: true,
+				},
 			},
 		}
 		cont.ensureStateFunc = func(manager *fs.Manager) error {
@@ -345,13 +349,17 @@ func ensureDockerInContainer(cadvisor cadvisor.Interface, oomScoreAdj int, manag
 
 // Gets the (CPU) container the specified pid is in.
 func getContainer(pid int) (string, error) {
-	f, err := os.Open(fmt.Sprintf("/proc/%d/cgroup", pid))
+	cgs, err := cgroups.ParseCgroupFile(fmt.Sprintf("/proc/%d/cgroup", pid))
 	if err != nil {
 		return "", err
 	}
-	defer f.Close()
 
-	return cgroups.ParseCgroupFile("cpu", f)
+	cg, ok := cgs["cpu"]
+	if ok {
+		return cg, nil
+	}
+
+	return "", cgroups.NewNotFoundError("cpu")
 }
 
 // Ensures the system container is created and all non-kernel threads and process 1
