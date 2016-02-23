@@ -1560,7 +1560,7 @@ func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Containe
 	if container.Name == PodInfraContainerName {
 		oomScoreAdj = qos.PodInfraOomAdj
 	} else {
-		oomScoreAdj = qos.GetContainerOomScoreAdjust(container, dm.machineInfo.MemoryCapacity)
+		oomScoreAdj = qos.GetContainerOomScoreAdjust(container, int64(dm.machineInfo.MemoryCapacity))
 	}
 	cgroupName, err := dm.procFs.GetFullContainerName(containerInfo.State.Pid)
 	if err != nil {
