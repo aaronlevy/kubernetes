@@ -74,8 +74,9 @@ func NewFsInfo(context Context) (FsInfo, error) {
 	fsInfo.labels = make(map[string]string, 0)
 	supportedFsType := map[string]bool{
 		// all ext systems are checked through prefix.
-		"btrfs": true,
-		"xfs":   true,
+		"btrfs":   true,
+		"xfs":     true,
+		"overlay": true,
 	}
 	for _, mount := range mounts {
 		if !strings.HasPrefix(mount.Fstype, "ext") && !supportedFsType[mount.Fstype] {
