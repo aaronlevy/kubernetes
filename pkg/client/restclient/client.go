@@ -100,8 +100,16 @@ func NewRESTClient(hosts []*url.URL, versionedAPIPath string, config ContentConf
 	} else if rateLimiter != nil {
 		throttle = rateLimiter
 	}
+
+	//TODO(aaronlevy): is client only nil during tests?
+	urlProvider := newSlightlyStickyProvider(hosts)
+	if client != nil {
+		prevRT := client.Transport
+		client.Transport = urlProvider.wrap(prevRT)
+	}
+
 	return &RESTClient{
-		urlProvider:      newSlightlyStickyProvider(hosts).get,
+		urlProvider:      urlProvider.get,
 		versionedAPIPath: versionedAPIPath,
 		contentConfig:    config,
 		serializers:      *serializers,
