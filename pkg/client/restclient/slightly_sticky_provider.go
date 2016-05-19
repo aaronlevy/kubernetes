@@ -23,6 +23,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang/glog"
+
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 )
 
@@ -53,6 +55,7 @@ type slightlyStickyProvider struct {
 func (s *slightlyStickyProvider) get() *url.URL {
 	s.RLock()
 	defer s.RUnlock()
+	glog.Infof("XXX: provider get: %d:%s", s.cur, s.hosts[s.cur].String())
 	return s.hosts[s.cur]
 }
 
@@ -67,12 +70,14 @@ func (s *slightlyStickyProvider) wrap(delegate http.RoundTripper) http.RoundTrip
 	return rtfunc(func(req *http.Request) (*http.Response, error) {
 		resp, err := delegate.RoundTrip(req)
 		if err != nil {
+			glog.Infof("XXX: delegate err: %v", err)
 			tryAccept := func() bool {
 				s.RLock()
 				defer s.RUnlock()
 				return !s.ratelimiter.TryAccept()
 			}
 			if tryAccept() {
+				glog.Info("XXX: delegate next")
 				s.next()
 			}
 		}
