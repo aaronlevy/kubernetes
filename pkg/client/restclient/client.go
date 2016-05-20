@@ -100,8 +100,13 @@ func NewRESTClient(hosts []*url.URL, versionedAPIPath string, config ContentConf
 	} else if rateLimiter != nil {
 		throttle = rateLimiter
 	}
+
+	urlProvider := newSlightlyStickyProvider(hosts)
+	prevRT := client.Transport
+	client.Transport = urlProvider.wrap(prevRT)
+
 	return &RESTClient{
-		urlProvider:      newSlightlyStickyProvider(hosts).get,
+		urlProvider:      urlProvider.get,
 		versionedAPIPath: versionedAPIPath,
 		contentConfig:    config,
 		serializers:      *serializers,
