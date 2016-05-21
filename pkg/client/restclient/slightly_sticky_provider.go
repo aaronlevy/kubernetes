@@ -21,35 +21,21 @@ import (
 	"net/http"
 	"net/url"
 	"sync"
-	"time"
 
 	"github.com/golang/glog"
-
-	"k8s.io/kubernetes/pkg/util/flowcontrol"
 )
 
 func newSlightlyStickyProvider(hosts []*url.URL) *slightlyStickyProvider {
-	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-	var errorsPerSecond float32 = 25
-	errorsBurst := 5
 	return &slightlyStickyProvider{
-		hosts:           hosts,
-		cur:             rng.Intn(len(hosts)),
-		rng:             rng,
-		errorsPerSecond: errorsPerSecond,
-		errorsBurst:     errorsBurst,
-		ratelimiter:     flowcontrol.NewTokenBucketRateLimiter(errorsPerSecond, errorsBurst),
+		hosts: hosts,
+		cur:   rand.Intn(len(hosts)),
 	}
 }
 
 type slightlyStickyProvider struct {
 	sync.RWMutex
-	hosts           []*url.URL
-	cur             int
-	rng             *rand.Rand
-	errorsPerSecond float32
-	errorsBurst     int
-	ratelimiter     flowcontrol.RateLimiter
+	hosts []*url.URL
+	cur   int
 }
 
 func (s *slightlyStickyProvider) get() *url.URL {
@@ -62,24 +48,19 @@ func (s *slightlyStickyProvider) get() *url.URL {
 func (s *slightlyStickyProvider) next() {
 	s.Lock()
 	defer s.Unlock()
-	s.cur = s.rng.Intn(len(s.hosts))
-	s.ratelimiter = flowcontrol.NewTokenBucketRateLimiter(s.errorsPerSecond, s.errorsBurst)
+	s.cur = (s.cur + 1) % len(s.hosts)
 }
 
 func (s *slightlyStickyProvider) wrap(delegate http.RoundTripper) http.RoundTripper {
+	// Fast-path of original single-host functionality
+	if len(s.hosts) == 1 {
+		return delegate
+	}
 	return rtfunc(func(req *http.Request) (*http.Response, error) {
 		resp, err := delegate.RoundTrip(req)
 		if err != nil {
 			glog.Infof("XXX: delegate err: %v", err)
-			tryAccept := func() bool {
-				s.RLock()
-				defer s.RUnlock()
-				return !s.ratelimiter.TryAccept()
-			}
-			if tryAccept() {
-				glog.Info("XXX: delegate next")
-				s.next()
-			}
+			s.next()
 		}
 		return resp, err
 	})

@@ -472,10 +472,6 @@ func CreateAPIServerClientConfig(s *options.KubeletServer) (*restclient.Config, 
 	if len(s.APIServerList) < 1 {
 		return nil, fmt.Errorf("no api servers specified")
 	}
-	// TODO: adapt Kube client to support LB over several servers
-	if len(s.APIServerList) > 1 {
-		glog.Infof("Multiple api servers specified.  Picking first one")
-	}
 
 	clientConfig, err := createClientConfig(s)
 	if err != nil {
