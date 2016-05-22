@@ -51,7 +51,7 @@ func TestSlightyStickyWrappedRoundTrip(t *testing.T) {
 func newHosts(c int) (hosts []*url.URL) {
 	for i := 0; i < c; i++ {
 		hosts = append(hosts, &url.URL{
-			Scheme: "https://",
+			Scheme: "https",
 			Host:   fmt.Sprintf("example%d", i),
 		})
 	}
