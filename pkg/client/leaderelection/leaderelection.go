@@ -248,13 +248,16 @@ func (le *LeaderElector) tryAcquireOrRenew() bool {
 	}
 
 	e, err := le.config.Client.Endpoints(le.config.EndpointsMeta.Namespace).Get(le.config.EndpointsMeta.Name)
+	glog.Infof("XXX: get endpoints err: %v", err)
 	if err != nil {
 		if !errors.IsNotFound(err) {
+			glog.Infof("XXX: is !notfound: %v", err)
 			return false
 		}
 
 		leaderElectionRecordBytes, err := json.Marshal(leaderElectionRecord)
 		if err != nil {
+			glog.Infof("XXX: error marshalling")
 			return false
 		}
 		_, err = le.config.Client.Endpoints(le.config.EndpointsMeta.Namespace).Create(&api.Endpoints{
@@ -275,6 +278,7 @@ func (le *LeaderElector) tryAcquireOrRenew() bool {
 		return true
 	}
 
+	glog.Info("XXX: no err getting endpoints")
 	if e.Annotations == nil {
 		e.Annotations = make(map[string]string)
 	}
@@ -282,16 +286,20 @@ func (le *LeaderElector) tryAcquireOrRenew() bool {
 	var oldLeaderElectionRecord LeaderElectionRecord
 
 	if oldLeaderElectionRecordBytes, found := e.Annotations[LeaderElectionRecordAnnotationKey]; found {
+		glog.Info("XXX: old leader bytes found")
 		if err := json.Unmarshal([]byte(oldLeaderElectionRecordBytes), &oldLeaderElectionRecord); err != nil {
+			glog.Info("XXX: Case 1")
 			glog.Errorf("error unmarshaling leader election record: %v", err)
 			return false
 		}
 		if !reflect.DeepEqual(le.observedRecord, oldLeaderElectionRecord) {
+			glog.Info("XXX: Case 2")
 			le.observedRecord = oldLeaderElectionRecord
 			le.observedTime = time.Now()
 		}
 		if le.observedTime.Add(le.config.LeaseDuration).After(now.Time) &&
 			oldLeaderElectionRecord.HolderIdentity != le.config.Identity {
+			glog.Info("XXX: Case 3")
 			glog.Infof("lock is held by %v and has not yet expired", oldLeaderElectionRecord.HolderIdentity)
 			return false
 		}
@@ -300,8 +308,10 @@ func (le *LeaderElector) tryAcquireOrRenew() bool {
 	// We're going to try to update. The leaderElectionRecord is set to it's default
 	// here. Let's correct it before updating.
 	if oldLeaderElectionRecord.HolderIdentity == le.config.Identity {
+		glog.Info("XXX: old == identity")
 		leaderElectionRecord.AcquireTime = oldLeaderElectionRecord.AcquireTime
 	} else {
+		glog.Info("XXX: old != identity")
 		leaderElectionRecord.LeaderTransitions = oldLeaderElectionRecord.LeaderTransitions + 1
 	}
 
@@ -319,15 +329,18 @@ func (le *LeaderElector) tryAcquireOrRenew() bool {
 	}
 	le.observedRecord = leaderElectionRecord
 	le.observedTime = time.Now()
+	glog.Info("XXX: ret true")
 	return true
 }
 
 func (l *LeaderElector) maybeReportTransition() {
 	if l.observedRecord.HolderIdentity == l.reportedLeader {
+		glog.Info("XXX: maybereport case1")
 		return
 	}
 	l.reportedLeader = l.observedRecord.HolderIdentity
 	if l.config.Callbacks.OnNewLeader != nil {
+		glog.Info("XXX: maybereport case 2")
 		go l.config.Callbacks.OnNewLeader(l.reportedLeader)
 	}
 }
