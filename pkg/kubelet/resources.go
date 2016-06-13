@@ -22,31 +22,52 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 )
 
-func (kl *Kubelet) defaultPodLimitsForDownwardApi(pod *api.Pod) (*api.Pod, error) {
-	capacity := make(api.ResourceList)
+// defaultPodLimitsForDownwardApi copies the input pod, and optional container, and applies default resource limits.
+// it returns a copy of the input pod, and a copy of the input container (if specified) with default limits applied.
+// if a container has no limit specified, it will default the limit to the node capacity.
+// TODO: if/when we have pod level resources, we need to update this function to use those limits instead of node capacity.
+func (kl *Kubelet) defaultPodLimitsForDownwardApi(pod *api.Pod, container *api.Container) (*api.Pod, *api.Container, error) {
+	if pod == nil {
+		return nil, nil, fmt.Errorf("invalid input, pod cannot be nil")
+	}
+
 	lastUpdatedNodeObject := kl.lastUpdatedNodeObject.Load()
 	if lastUpdatedNodeObject == nil {
-		return nil, fmt.Errorf("Failed to find node object in cache. Expected a non-nil object in the cache.")
-	} else {
-		capacity = lastUpdatedNodeObject.(*api.Node).Status.Capacity
+		return nil, nil, fmt.Errorf("failed to find node object in cache, expected a non-nil object in the cache.")
 	}
+	capacity := lastUpdatedNodeObject.(*api.Node).Status.Capacity
+
 	podCopy, err := api.Scheme.Copy(pod)
 	if err != nil {
-		return nil, fmt.Errorf("failed to perform a deep copy of pod object. Error: %v", err)
+		return nil, nil, fmt.Errorf("failed to perform a deep copy of pod object: %v", err)
 	}
-	pod = podCopy.(*api.Pod)
-	for idx, c := range pod.Spec.Containers {
-		for _, resource := range []api.ResourceName{api.ResourceCPU, api.ResourceMemory} {
-			if quantity, exists := c.Resources.Limits[resource]; !exists || quantity.IsZero() {
-				if cap, exists := capacity[resource]; exists {
-					if pod.Spec.Containers[idx].Resources.Limits == nil {
-						pod.Spec.Containers[idx].Resources.Limits = make(api.ResourceList)
-					}
-					pod.Spec.Containers[idx].Resources.Limits[resource] = cap
-				}
+	outputPod := podCopy.(*api.Pod)
+	for idx := range outputPod.Spec.Containers {
+		mergeContainerResourceLimitsWithCapacity(&outputPod.Spec.Containers[idx], capacity)
+	}
 
+	var outputContainer *api.Container
+	if container != nil {
+		containerCopy, err := api.Scheme.DeepCopy(container)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to perform a deep copy of container object: %v", err)
+		}
+		outputContainer = containerCopy.(*api.Container)
+		mergeContainerResourceLimitsWithCapacity(outputContainer, capacity)
+	}
+	return outputPod, outputContainer, nil
+}
+
+// mergeContainerResourceLimitsWithCapacity checks if a limit is applied for the container, and if not, it sets the limit based on the capacity.
+func mergeContainerResourceLimitsWithCapacity(container *api.Container, capacity api.ResourceList) {
+	if container.Resources.Limits == nil {
+		container.Resources.Limits = make(api.ResourceList)
+	}
+	for _, resource := range []api.ResourceName{api.ResourceCPU, api.ResourceMemory} {
+		if quantity, exists := container.Resources.Limits[resource]; !exists || quantity.IsZero() {
+			if cap, exists := capacity[resource]; exists {
+				container.Resources.Limits[resource] = *cap.Copy()
 			}
 		}
 	}
-	return pod, nil
 }
