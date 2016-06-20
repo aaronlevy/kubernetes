@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/types"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 )
 
@@ -217,4 +218,72 @@ func (kl *Kubelet) GetHostIP() (net.IP, error) {
 		return nil, fmt.Errorf("cannot get node: %v", err)
 	}
 	return nodeutil.GetNodeHostIP(node)
+}
+
+func (kl *Kubelet) getHostIPAnyWay() (net.IP, error) {
+	if !kl.standaloneMode {
+		if n, err := kl.nodeInfo.GetNodeInfo(kl.nodeName); err == nil {
+			return nodeutil.GetNodeHostIP(n)
+		}
+	}
+	addresses, err := kl.getLocalNodeAddresses(kl.nodeName)
+	if err != nil {
+		return nil, err
+	}
+
+	n := &api.Node{}
+	n.Status.Addresses = addresses
+	return nodeutil.GetNodeHostIP(n)
+}
+
+func (kl *Kubelet) getLocalNodeAddresses(nodeName string) ([]api.NodeAddress, error) {
+	if kl.nodeIP != nil {
+		addresses := []api.NodeAddress{
+			{Type: api.NodeLegacyHostIP, Address: kl.nodeIP.String()},
+			{Type: api.NodeInternalIP, Address: kl.nodeIP.String()},
+		}
+		return addresses, nil
+	}
+	if addr := net.ParseIP(kl.hostname); addr != nil {
+		addresses := []api.NodeAddress{
+			{Type: api.NodeLegacyHostIP, Address: addr.String()},
+			{Type: api.NodeInternalIP, Address: addr.String()},
+		}
+		return addresses, nil
+	}
+
+	addrs, err := net.LookupIP(nodeName)
+	if err != nil {
+		return nil, fmt.Errorf("can't get ip address of node %s: %v", nodeName, err)
+	}
+	if len(addrs) == 0 {
+		return nil, fmt.Errorf("no ip address for node %v", nodeName)
+	}
+
+	// check all ip addresses for this nodeName and try to find the first non-loopback IPv4 address.
+	// If no match is found, it uses the IP of the interface with gateway on it.
+	for _, ip := range addrs {
+		if ip.IsLoopback() {
+			continue
+		}
+
+		if ip.To4() != nil {
+			addresses := []api.NodeAddress{
+				{Type: api.NodeLegacyHostIP, Address: ip.String()},
+				{Type: api.NodeInternalIP, Address: ip.String()},
+			}
+			return addresses, nil
+		}
+	}
+
+	ip, err := utilnet.ChooseHostInterface()
+	if err != nil {
+		return nil, err
+	}
+
+	addresses := []api.NodeAddress{
+		{Type: api.NodeLegacyHostIP, Address: ip.String()},
+		{Type: api.NodeInternalIP, Address: ip.String()},
+	}
+	return addresses, nil
 }
