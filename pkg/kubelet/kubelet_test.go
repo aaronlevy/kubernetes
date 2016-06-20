@@ -3688,6 +3688,7 @@ func TestPrivilegeContainerAllowed(t *testing.T) {
 
 func TestPrivilegeContainerDisallowed(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
 	kubelet := testKubelet.kubelet
 
 	capabilities.SetForTests(capabilities.Capabilities{
