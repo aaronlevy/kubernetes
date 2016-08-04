@@ -1513,6 +1513,7 @@ func (dm *DockerManager) applyOOMScoreAdj(pod *api.Pod, container *api.Container
 // Run a single container from a pod. Returns the docker container ID
 // If do not need to pass labels, just pass nil.
 func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Container, netMode, ipcMode, pidMode, podIP string, restartCount int) (kubecontainer.ContainerID, error) {
+	glog.Infof("XXX entering runContainerInPod PodIP: %s", podIP)
 	start := time.Now()
 	defer func() {
 		metrics.ContainerManagerLatency.WithLabelValues("runContainerInPod").Observe(metrics.SinceInMicroseconds(start))
@@ -1978,8 +1979,10 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubec
 	// infra container needs to be (re)started.
 	podIP := ""
 	if podStatus != nil {
+		glog.Infof("XXX SyncPod podstatus.IP: %s", podStatus.IP)
 		podIP = podStatus.IP
 	}
+	glog.Infof("XXX SyncPod podIP: %s", podIP)
 
 	// If we should create infra container then we do it first.
 	podInfraContainerID := containerChanges.InfraContainerId
@@ -2034,6 +2037,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubec
 
 			// Overwrite the podIP passed in the pod status, since we just started the infra container.
 			podIP = dm.determineContainerIP(pod.Name, pod.Namespace, podInfraContainer)
+			glog.Infof("XXX podIP from determineContainerIP: %s", podIP)
 		}
 	}
 
@@ -2081,6 +2085,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubec
 		}
 
 		glog.V(4).Infof("Creating init container %+v in pod %v", container, format.Pod(pod))
+		glog.Infof("XXX init container podIP passed to tryContainerStart: %s", podIP)
 		if err, msg := dm.tryContainerStart(container, pod, podStatus, pullSecrets, namespaceMode, pidMode, podIP); err != nil {
 			startContainerResult.Fail(err, msg)
 			utilruntime.HandleError(fmt.Errorf("container start failed: %v: %s", err, msg))
@@ -2119,6 +2124,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubec
 		}
 
 		glog.V(4).Infof("Creating container %+v in pod %v", container, format.Pod(pod))
+		glog.Infof("XXX regular container podIP passed to tryContainerStart: %s", podIP)
 		if err, msg := dm.tryContainerStart(container, pod, podStatus, pullSecrets, namespaceMode, pidMode, podIP); err != nil {
 			startContainerResult.Fail(err, msg)
 			utilruntime.HandleError(fmt.Errorf("container start failed: %v: %s", err, msg))
@@ -2150,6 +2156,7 @@ func (dm *DockerManager) tryContainerStart(container *api.Container, pod *api.Po
 		restartCount = containerStatus.RestartCount + 1
 	}
 
+	glog.Infof("XXX tryContainerStart.runContainerInPod .podIP: %s", podIP)
 	_, err = dm.runContainerInPod(pod, container, namespaceMode, namespaceMode, pidMode, podIP, restartCount)
 	if err != nil {
 		// TODO(bburns) : Perhaps blacklist a container after N failures?

@@ -1746,6 +1746,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	// The pod IP may be changed in generateAPIPodStatus if the pod is using host network. (See #24576)
 	// TODO(random-liu): After writing pod spec into container labels, check whether pod is using host network, and
 	// set pod IP to hostIP directly in runtime.GetPodStatus
+	glog.Infof("XXX apipodstatus.podIP: %s", apiPodStatus.PodIP)
 	podStatus.IP = apiPodStatus.PodIP
 
 	// Record the time it takes for the pod to become running.
@@ -1817,6 +1818,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	}
 
 	// Call the container runtime's SyncPod callback
+	glog.Infof("XXX podstatus.IP passed to runtime.SyncPod: %s", podStatus.IP)
 	result := kl.containerRuntime.SyncPod(pod, apiPodStatus, podStatus, pullSecrets, kl.backOff)
 	kl.reasonCache.Update(pod.UID, result)
 	if err = result.Error(); err != nil {
@@ -3297,9 +3299,11 @@ func (kl *Kubelet) generateAPIPodStatus(pod *api.Pod, podStatus *kubecontainer.P
 			glog.V(4).Infof("Cannot get host IP: %v", err)
 		} else {
 			s.HostIP = hostIP.String()
+			glog.Infof("XXX pod IP before hostnetwork check: %s", s.PodIP)
 			if podUsesHostNetwork(pod) && s.PodIP == "" {
 				s.PodIP = hostIP.String()
 			}
+			glog.Infof("XXX pod IP after hostnetwork check: %s", s.PodIP)
 		}
 	}
 
