@@ -1705,7 +1705,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	podStatus := o.podStatus
 	updateType := o.updateType
 
-	glog.Infof("XXX kubelet syncPod podstatus.podIP %s", podStatus.PodIP)
+	glog.Infof("XXX kubelet syncPod podstatus.podIP %s", podStatus.IP)
 	glog.Infof("XXX kubelet syncPod pod %v", format.Pod(pod))
 
 	// if we want to kill a pod, do it now!
